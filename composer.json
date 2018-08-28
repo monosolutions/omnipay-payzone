@@ -1,0 +1,22 @@
+{
+    "name": "monosolutions/omnipay-payzone",
+    "description": "An Omnipay Integration for PayZone's hosted form.",
+    "type": "library",
+    "require-dev": {
+        "omnipay/tests": "~2.0"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Thomas Faurbye Nielsen",
+            "email": "archanium@gmail.com"
+        }
+    ],
+    "require": {
+        "omnipay/common": "~2.0"
+    },
+    "minimum-stability": "stable",
+    "autoload": {
+        "psr-4": { "Omnipay\\PayZone\\" : "src/" }
+    }
+}
