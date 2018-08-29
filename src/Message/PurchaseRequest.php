@@ -2,6 +2,9 @@
 
 namespace Omnipay\PayZone\Message;
 
+use function array_key_exists;
+use const FILTER_VALIDATE_BOOLEAN;
+use function http_build_query;
 use InvalidArgumentException;
 use Omnipay\Common\Message\AbstractRequest;
 use Omnipay\Common\Message\ResponseInterface;
@@ -69,14 +72,31 @@ class PurchaseRequest extends AbstractRequest
         return parent::initialize($parameters);
     }
 
+    protected function boolToString($value)
+    {
+        $val = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+
+        return json_encode($val);
+    }
+
+    public function setTransactionTime($time)
+    {
+        $this->setParameter('transaction_time', $time);
+
+        return $this;
+    }
+
     public function getData()
     {
-        $this->validate('amount', 'merchant_id', 'password', 'hash_method', 'pre_shared_key', 'currency', 'transactionReference', 'customer_name', 'address1', 'city');
+        $this->validate('amount', 'merchant_id', 'password', 'hash_method', 'pre_shared_key', 'currency', 'transactionReference', 'customer_name', 'address1', 'city', 'notifyUrl');
         $data['amount'] = $this->getAmountInteger();
         $data['currency'] = $this->getCurrencyNumeric();
         $data['orderid'] = $this->getTransactionReference();
         $data['CallbackUrl'] = $this->getNotifyUrl();
-
+        $transactionTime = $this->get('transaction_time');
+        if (!$transactionTime) {
+            $transactionTime = date('Y-m-d H:i:s P');
+        }
         $nextData = [
             'MerchantID' => $this->getMerchantId(),
             'Password' => $this->getPassword(),
@@ -86,9 +106,10 @@ class PurchaseRequest extends AbstractRequest
             'EchoCV2CheckResult' => 'true',
             'EchoThreeDSecureAuthenticationCheckResult' => 'true',
             'EchoCardType' => 'true',
+            'EchoFraudProtectionCheckResult' => 'true',
             'OrderID' => $this->getTransactionReference(),
             'TransactionType' => 'SALE',
-            'TransactionDateTime' => date('Y-m-d H:i:s P'),
+            'TransactionDateTime' => $transactionTime,
             'CallbackURL' => $this->getNotifyUrl(),
             'OrderDescription' => $this->getDescription(),
             'CustomerName' => $this->get('customer_name'),
@@ -100,21 +121,20 @@ class PurchaseRequest extends AbstractRequest
             'State' => $this->get('state'),
             'PostCode' => $this->get('post_code'),
             'CountryCode' => $this->get('country_code'),
-            'CV2Mandatory' => $this->get('cv2_mandatory'),
-            'Address1Mandatory' => $this->get('address1_mandatory'),
-            'CityMandatory' => $this->get('city_mandatory'),
-            'PostCodeMandatory' => $this->get('post_code_mandatory'),
-            'StateMandatory' => $this->get('state_mandatory'),
-            'CountryMandatory' => $this->get('country_mandatory'),
+            'CV2Mandatory' => $this->boolToString($this->get('cv2_mandatory')),
+            'Address1Mandatory' => $this->boolToString($this->get('address1_mandatory')),
+            'CityMandatory' => $this->boolToString($this->get('city_mandatory')),
+            'PostCodeMandatory' => $this->boolToString($this->get('post_code_mandatory')),
+            'StateMandatory' => $this->boolToString($this->get('state_mandatory')),
+            'CountryMandatory' => $this->boolToString($this->get('country_mandatory')),
             'ResultDeliveryMethod' => 'POST',
-            'ServerResultURL' => '',
-            'PaymentFormDisplaysResult' => '',
         ];
 
         $hashMethod = $this->getHashMethod();
         $psk = $this->getPreSharedKey();
         $hashArg = $this->generateStringToHash($psk, $hashMethod, $nextData);
         $nextData['HashDigest'] = $this->calculateHashDigest($hashArg, $psk, $hashMethod);
+        unset($nextData['Password']);
 
         return $nextData;
     }
@@ -164,10 +184,9 @@ class PurchaseRequest extends AbstractRequest
         return $this->{$getName}();
     }
 
-    protected function generateStringToHash($szPreSharedKey, $szHashMethod, $data)
+    protected function generateStringToHash($szPreSharedKey, $szHashMethod, $formData)
     {
-        $szReturnString = "";
-        $defaults = array_merge([
+        $data = array_merge([
             'MerchantID' => '',
             'Password' => '',
             'Amount' => '',
@@ -175,13 +194,28 @@ class PurchaseRequest extends AbstractRequest
             'EchoAVSCheckResult' => '',
             'EchoCV2CheckResult' => '',
             'EchoThreeDSecureAuthenticationCheckResult' => '',
+            'EchoFraudProtectionCheckResult' => '',
             'EchoCardType' => '',
+            'EchoCardNumberFirstSix' => '',
+            'EchoCardNumberLastFour' => '',
+            'EchoCardExpiryDate' => '',
+            'EchoDonationAmount' => '',
+            'AVSOverridePolicy' => '',
+            'CV2OverridePolicy' => '',
+            'ThreeDSecureOverridePolicy' => '',
             'OrderID' => '',
             'TransactionType' => '',
             'TransactionDateTime' => '',
+            'DisplayCancelButton' => '',
             'CallbackURL' => '',
             'OrderDescription' => '',
+            'LineItemSalesTaxAmount' => '',
+            'LineItemSalesTaxDescription' => '',
+            'LineItemQuantity' => '',
+            'LineItemAmount' => '',
+            'LineItemDescription' => '',
             'CustomerName' => '',
+            'DisplayBillingAddress' => '',
             'Address1' => '',
             'Address2' => '',
             'Address3' => '',
@@ -190,16 +224,50 @@ class PurchaseRequest extends AbstractRequest
             'State' => '',
             'PostCode' => '',
             'CountryCode' => '',
+            'EmailAddress' => '',
+            'PhoneNumber' => '',
+            'DateOfBirth' => '',
+            'DisplayShippingDetails' => '',
+            'ShippingName' => '',
+            'ShippingAddress1' => '',
+            'ShippingAddress2' => '',
+            'ShippingAddress3' => '',
+            'ShippingAddress4' => '',
+            'ShippingCity' => '',
+            'ShippingState' => '',
+            'ShippingPostCode' => '',
+            'ShippingCountryCode' => '',
+            'ShippingEmailAddress' => '',
+            'ShippingPhoneNumber' => '',
+            'CustomerNameEditable' => '',
+            'EmailAddressEditable' => '',
+            'PhoneNumberEditable' => '',
+            'DateOfBirthEditable' => '',
             'CV2Mandatory' => '',
             'Address1Mandatory' => '',
             'CityMandatory' => '',
             'PostCodeMandatory' => '',
             'StateMandatory' => '',
             'CountryMandatory' => '',
+            'ShippingAddress1Mandatory' => '',
+            'ShippingCityMandatory' => '',
+            'ShippingPostCodeMandatory' => '',
+            'ShippingStateMandatory' => '',
+            'ShippingCountryMandatory' => '',
             'ResultDeliveryMethod' => '',
             'ServerResultURL' => '',
             'PaymentFormDisplaysResult' => '',
-        ], $data);
+            'ServerResultURLCookieVariables' => '',
+            'ServerResultURLFormVariables' => '',
+            'ServerResultURLQueryStringVariables' => '',
+            'PrimaryAccountName' => '',
+            'PrimaryAccountNumber' => '',
+            'PrimaryAccountDateOfBirth' => '',
+            'PrimaryAccountPostCode' => '',
+            'Skin' => '',
+            'PaymentFormContentMode' => '',
+            'BreakoutOfIFrameOnCallback' => '',
+        ], $formData);
         switch ($szHashMethod) {
             case "MD5":
                 $boIncludePreSharedKeyInString = true;
@@ -214,45 +282,19 @@ class PurchaseRequest extends AbstractRequest
                 $boIncludePreSharedKeyInString = false;
                 break;
         }
+        $szReturn = [];
         if ($boIncludePreSharedKeyInString) {
-            $szReturnString = "PreSharedKey=" . $szPreSharedKey . "&";
+            $szReturn[] = "PreSharedKey={$szPreSharedKey}";
         }
 
-        $szReturnString .=
-            "MerchantID=" . $data['MerchantID'] .
-            "&Password=" . $data['Password'] .
-            "&Amount=" . $data['Amount'] .
-            "&CurrencyCode=" . $data['CurrencyCode'] .
-            "&EchoAVSCheckResult=" . $data['EchoAVSCheckResult'] .
-            "&EchoCV2CheckResult=" . $data['EchoCV2CheckResult'] .
-            "&EchoThreeDSecureAuthenticationCheckResult=" . $data['EchoThreeDSecureAuthenticationCheckResult'] .
-            "&EchoCardType=" . $data['EchoCardType'] .
-            "&OrderID=" . $data['OrderID'] .
-            "&TransactionType=" . $data['TransactionType'] .
-            "&TransactionDateTime=" . $data['TransactionDateTime'] .
-            "&CallbackURL=" . $data['CallbackURL'] .
-            "&OrderDescription=" . $data['OrderDescription'] .
-            "&CustomerName=" . $data['CustomerName'] .
-            "&Address1=" . $data['Address1'] .
-            "&Address2=" . $data['Address2'] .
-            "&Address3=" . $data['Address3'] .
-            "&Address4=" . $data['Address4'] .
-            "&City=" . $data['City'] .
-            "&State=" . $data['State'] .
-            "&PostCode=" . $data['PostCode'] .
-            "&CountryCode=" . $data['CountryCode'] .
-            "&CV2Mandatory=" . $data['CV2Mandatory'] .
-            "&Address1Mandatory=" . $data['Address1Mandatory'] .
-            "&CityMandatory=" . $data['CityMandatory'] .
-            "&PostCodeMandatory=" . $data['PostCodeMandatory'] .
-            "&StateMandatory=" . $data['StateMandatory'] .
-            "&CountryMandatory=" . $data['CountryMandatory'] .
-            "&ResultDeliveryMethod=" . $data['ResultDeliveryMethod'] .
-            "&ServerResultURL=" . $data['ServerResultURL'] .
-            "&PaymentFormDisplaysResult=" . $data['PaymentFormDisplaysResult'] .
-            '&ServerResultURLCookieVariables=' . '&ServerResultURLFormVariables=' . '&ServerResultURLQueryStringVariables=';
+        foreach ($data as $key => $value) {
+            if ($value === '' && !array_key_exists($key, $formData)) {
+                continue;
+            }
+            $szReturn[] = "{$key}={$value}";
+        }
 
-        return $szReturnString;
+        return implode("&", $szReturn);
     }
 
     protected function calculateHashDigest($input, $psk, $hashMethod)

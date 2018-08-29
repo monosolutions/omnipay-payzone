@@ -21,10 +21,7 @@ class PurchaseResponse extends AbstractResponse implements RedirectResponseInter
 
     public function getEndpoint()
     {
-        if ($this->getRequest()->getTestMode()) {
-            return self::TEST_ENDPOINT;
-        }
-        return self::LIVE_ENDPOINT;
+        return self::FORM_URL;
     }
 
     public function getRedirectUrl()
